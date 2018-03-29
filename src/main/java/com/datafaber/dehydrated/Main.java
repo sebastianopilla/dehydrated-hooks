@@ -24,16 +24,6 @@ public class Main {
   private static final String COMMAND = "command";
   private static final String COMMAND_DEPLOY_CHALLENGE = "deploy_challenge";
   private static final String COMMAND_CLEAN_CHALLENGE = "clean_challenge";
-  private static final Set<String> OTHER_COMMANDS = new HashSet<String>() {
-    {
-      add("deploy_cert");
-      add("unchanged_cert");
-      add("invalid_challenge");
-      add("request_failure");
-      add("startup_hook");
-      add("exit_hook");
-    }
-  };
   private static final String HOSTNAME = "hostname";
   private static final String VALUE = "value";
 
@@ -59,13 +49,8 @@ public class Main {
       String hostname = cmd.getOptionValue(HOSTNAME);
       String value = cmd.getOptionValue(VALUE);
       if (!(COMMAND_DEPLOY_CHALLENGE.equals(command) || COMMAND_CLEAN_CHALLENGE.equals(command))) {
-        // exit with status 0 (no errors) if the command is one of OTHER_COMMANDS but not COMMAND_DEPLOY_CHALLENGE nor COMMAND_CLEAN_CHALLENGE
-        if (OTHER_COMMANDS.contains(command)) {
-          System.exit(0);
-        } else {
-          // exit with status 42 if we cannot process the command
-          System.exit(42);
-        }
+        // since dehydrated 0.6.1 we should ignore (that is, return 0) any unknown command - which feels broken to me but so it is
+        System.exit(0);
       }
       String configurationPath = cmd.getOptionValue(CONFIGURATION);
       if (null == configurationPath || "".equals(configurationPath)) {
