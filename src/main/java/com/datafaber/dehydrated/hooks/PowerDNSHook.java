@@ -129,7 +129,7 @@ public class PowerDNSHook implements Hook {
       String body = response.getBody();
       JSONArray zones = new JSONArray(body);
       String[] hostnameParts = hostname.split("\\.");
-      if (zones != null && zones.length() > 0) {
+      if (zones.length() > 0) {
         for (int i = 0; i < zones.length(); i++) {
           JSONObject zone = zones.getJSONObject(i);
           String zoneName = zone.getString("name");
@@ -159,19 +159,22 @@ public class PowerDNSHook implements Hook {
     } catch (UnirestException ue) {
       mLogger.error(ctx + "UnirestException for request " + url, ue);
     }
+    if (id.endsWith(".")) {
+      id = id.substring(0, id.length() - 1);
+    }
     return id;
   }
 
 
   /**
-   * Sends a request to the PowerDNS API
+   * Modifies a record set via PowerDNS API
    * @param pServerId PowerDNS server id (usually "localhost")
    * @param pZoneId id of zone to manipulate
    * @param pRequestBody body of request to send
    * @return true if the response's status code was 200 or 204, false otherwise
    */
-  private boolean apiRequest (String pServerId, String pZoneId, JSONObject pRequestBody) {
-    String ctx  = "apiRequest - ";
+  private boolean modifyRecord (String pServerId, String pZoneId, JSONObject pRequestBody) {
+    String ctx  = "modifyRecord - ";
     String url = "/api/v1/servers/" + pServerId + "/zones/" + pZoneId;
     boolean result = false;
     try {
@@ -179,6 +182,34 @@ public class PowerDNSHook implements Hook {
               header("Content-Type", "application/json;charset=UTF-8").
               header("X-API-Key", mAPIKey).
               body(pRequestBody).
+              asString();
+      result = checkResponse(response);
+      if (!result) {
+        mLogger.error(ctx + "API endpoint returned " + response.getStatus() + " for request " + url);
+      } else {
+        mLogger.info(ctx + "successful API request for request " + url);
+      }
+    } catch (UnirestException ue) {
+      mLogger.error(ctx + "UnirestException for request " + url, ue);
+    }
+    return result;
+  }
+
+
+  /**
+   * Trigger a notification for the given zone
+   * @param pServerId PowerDNS server id (usually "localhost")
+   * @param pZoneId id of zone to manipulate
+   * @return true if the notification can be sent, false otherwise
+   */
+  private boolean triggerNotify (String pServerId, String pZoneId) {
+    String ctx = "triggerNotify - ";
+    String url = "/api/v1/servers/" + pServerId + "/zones/" + pZoneId + "/notify";
+    boolean result = false;
+    try {
+      HttpResponse<String> response = Unirest.put(mAPIEndpointURL + url).
+              header("Content-Type", "application/json;charset=UTF-8").
+              header("X-API-Key", mAPIKey).
               asString();
       result = checkResponse(response);
       if (!result) {
@@ -238,7 +269,13 @@ public class PowerDNSHook implements Hook {
     rrsets.put(rrset);
     JSONObject requestBody = new JSONObject();
     requestBody.put("rrsets", rrsets);
-    return apiRequest(pServerId, pZoneId, requestBody);
+    boolean result = modifyRecord(pServerId, pZoneId, requestBody);
+
+    // need to tell PowerDNS to notify slaves, otherwise the new record will never be propagated
+    if (result) {
+      result = triggerNotify(pServerId, pZoneId);
+    }
+    return result;
   }
 
 
@@ -264,7 +301,13 @@ public class PowerDNSHook implements Hook {
     rrsets.put(rrset);
     JSONObject requestBody = new JSONObject();
     requestBody.put("rrsets", rrsets);
-    return apiRequest(pServerId, pZoneId, requestBody);
+    boolean result = modifyRecord(pServerId, pZoneId, requestBody);
+
+    // need to tell PowerDNS to notify slaves, otherwise the deleted record will never be propagated
+    if (result) {
+      result = triggerNotify(pServerId, pZoneId);
+    }
+    return result;
   }
 
 
