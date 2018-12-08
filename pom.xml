@@ -4,7 +4,7 @@
 
   <groupId>com.datafaber</groupId>
   <artifactId>dehydrated-hooks</artifactId>
-  <version>1.0.3-SNAPSHOT</version>
+  <version>1.0.3</version>
 
   <name>dehydrated-hooks</name>
 
